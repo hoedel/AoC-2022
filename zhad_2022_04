@@ -1,0 +1,123 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_04.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_pair,
+             first_from  TYPE i,
+             first_to    TYPE i,
+             second_from TYPE i,
+             second_to   TYPE i,
+           END OF ty_pair.
+
+    DATA: mt_assignments TYPE TABLE OF ty_pair.
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    TRY.
+
+        DATA: ref_to_data        TYPE REF TO data.
+        FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+        CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_pair.
+
+        parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                    seperator1_space = p_sspace
+                                    newline_at_sep   = p_tnewl
+                                    remove_space     = p_remsp
+                                    replace_source   = p_reps
+                                    replace_target   = p_rept
+                                    seperator2       = CONV #( p_sep2 )
+                            CHANGING data            = ref_to_data ).
+
+        ASSIGN ref_to_data->* TO <data>.
+        mt_assignments = <data>.
+
+      CATCH /wsv/cx_bp_general INTO DATA(exception).
+        exception->create_message( ).
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    LOOP AT mt_assignments ASSIGNING FIELD-SYMBOL(<assignment>).
+
+
+      IF ( <assignment>-first_from >= <assignment>-second_from
+      AND <assignment>-first_to <= <assignment>-second_to )  " one is fully contained in two
+       OR
+       ( <assignment>-second_from >= <assignment>-first_from
+      AND <assignment>-second_to <= <assignment>-first_to ). "two contained in one
+
+        mv_result_part1 = mv_result_part1 + 1.
+
+      ENDIF.
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    LOOP AT mt_assignments ASSIGNING FIELD-SYMBOL(<assignment>).
+
+      IF ( <assignment>-first_from >= <assignment>-second_from
+        and  <assignment>-second_to >= <assignment>-first_from )
+        or ( ( <assignment>-first_to >= <assignment>-second_from
+        and  <assignment>-second_to >= <assignment>-first_from ) ).
+
+        mv_result_part2 = mv_result_part2 + 1.
+
+      ENDIF.
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'dayXX.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+
+      riddle->print_result( ).
+
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
