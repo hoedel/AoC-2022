@@ -1,0 +1,170 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_08.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    DATA: mt_data.
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    parse_input_2d_sep( EXPORTING by_position = p_2dpos
+                      IMPORTING data = mt_2d ).
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    DATA: directions_deltas TYPE TABLE OF ty_2d,
+          visible           TYPE abap_bool.
+
+
+    directions_deltas = VALUE #(
+    ( x = -1 y = 0 )
+    ( x =  1 y = 0 )
+    ( x =  0 y = -1 )
+    ( x =  0 y = 1 ) ).
+
+    DATA(max) = sqrt( lines( mt_2d ) ) - 1.
+
+    LOOP AT mt_2d ASSIGNING FIELD-SYMBOL(<tree>).
+
+      "Look into all directions
+      LOOP AT directions_deltas ASSIGNING FIELD-SYMBOL(<delta>).
+
+        visible = abap_true.
+
+        DATA(neighbour_coordinates) = <tree>.
+
+        WHILE neighbour_coordinates-x > 0
+          AND neighbour_coordinates-x < max
+          AND neighbour_coordinates-y > 0
+          AND neighbour_coordinates-y < max.
+
+          neighbour_coordinates-x = neighbour_coordinates-x + <delta>-x.
+          neighbour_coordinates-y = neighbour_coordinates-y + <delta>-y.
+
+          DATA(neightbour) = mt_2d[ x = neighbour_coordinates-x y = neighbour_coordinates-y ].
+
+          IF neightbour-value >= <tree>-value.
+            visible = abap_false.
+            EXIT.
+          ENDIF.
+
+
+        ENDWHILE.
+
+        IF visible = abap_true.
+          mv_result_part1 = mv_result_part1 + 1.
+          EXIT.
+        ENDIF.
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+
+    DATA: directions_deltas TYPE TABLE OF ty_2d,
+          visible           TYPE abap_bool.
+
+
+    directions_deltas = VALUE #(
+    ( x = -1 y = 0 )
+    ( x =  1 y = 0 )
+    ( x =  0 y = -1 )
+    ( x =  0 y = 1 ) ).
+
+    DATA(max) = sqrt( lines( mt_2d ) ) - 1.
+
+    LOOP AT mt_2d ASSIGNING FIELD-SYMBOL(<tree>).
+
+      DATA(total_distance) = 0.
+
+      "Look into all directions
+      LOOP AT directions_deltas ASSIGNING FIELD-SYMBOL(<delta>).
+
+        visible = abap_true.
+        DATA(distance) = 0.
+
+        DATA(neighbour_coordinates) = <tree>.
+
+        WHILE neighbour_coordinates-x > 0
+          AND neighbour_coordinates-x < max
+          AND neighbour_coordinates-y > 0
+          AND neighbour_coordinates-y < max.
+
+          distance = distance + 1.
+
+          neighbour_coordinates-x = neighbour_coordinates-x + <delta>-x.
+          neighbour_coordinates-y = neighbour_coordinates-y + <delta>-y.
+
+          DATA(neightbour) = mt_2d[ x = neighbour_coordinates-x y = neighbour_coordinates-y ].
+
+          IF neightbour-value >= <tree>-value.
+            EXIT.
+          ENDIF.
+
+        ENDWHILE.
+
+        IF total_distance = 0.
+          total_distance = distance.
+        ELSE.
+          total_distance = total_distance * distance.
+        ENDIF.
+
+      ENDLOOP.
+
+      IF total_distance > mv_result_part2.
+        mv_result_part2 = total_distance.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'day08.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
