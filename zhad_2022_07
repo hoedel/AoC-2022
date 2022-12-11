@@ -1,0 +1,223 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_07.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_terminal_output,
+             part1 TYPE string,
+             part2 TYPE string,
+             part3 TYPE string,
+           END OF ty_terminal_output,
+
+           BEGIN OF ty_file_list,
+             id     TYPE i,
+             name   TYPE string,
+             size   TYPE i,
+             type   TYPE char1,
+             parent TYPE i,
+           END OF ty_file_list.
+
+
+    DATA: mt_terminal_output TYPE TABLE OF ty_terminal_output,
+          mt_file_list       TYPE TABLE OF ty_file_list.
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+    METHODS calculate_dir_size
+      IMPORTING dir_id TYPE i.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: ref_to_data        TYPE REF TO data.
+    FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+    TRY.
+
+        CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_terminal_output.
+
+        parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                    seperator1_space = p_sspace
+                                    newline_at_sep   = p_tnewl
+                                    remove_space     = p_remsp
+                                    replace_source   = p_reps
+                                    replace_target   = p_rept
+                                    seperator2       = CONV #( p_sep2 )
+                            CHANGING data            = ref_to_data ).
+
+        ASSIGN ref_to_data->* TO <data>.
+        mt_terminal_output = <data>.
+
+      CATCH /wsv/cx_bp_general INTO DATA(exception).
+        exception->create_message( ).
+    ENDTRY.
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    DATA: current_dir TYPE ty_file_list,
+          new_entry   TYPE ty_file_list,
+          max_id      TYPE i.
+
+    "Insert initial dir
+
+    max_id = 1.
+    current_dir = VALUE #(  id = max_id name = '/' size = 0 type = 'D' ).
+    INSERT current_dir INTO TABLE mt_file_list.
+
+    READ TABLE mt_file_list INDEX 1 ASSIGNING FIELD-SYMBOL(<current_dir>).
+
+
+
+
+    "build file list
+    LOOP AT mt_terminal_output ASSIGNING FIELD-SYMBOL(<terminal_output>).
+
+      IF <terminal_output>-part1 = '$'. "Command
+
+        CASE <terminal_output>-part2.
+
+          WHEN 'cd'.
+
+            IF <terminal_output>-part3 = '..'. "one level up
+
+              READ TABLE mt_file_list WITH KEY id = <current_dir>-parent
+                          ASSIGNING <current_dir>.
+
+            ELSE.
+
+              " get target
+
+              READ TABLE mt_file_list WITH KEY parent = <current_dir>-id
+                                                 name = <terminal_output>-part3
+                                      ASSIGNING <current_dir>.
+
+            ENDIF.
+
+        ENDCASE.
+
+      ELSEIF <terminal_output>-part1 = 'dir'. "new dir
+
+        CLEAR: new_entry.
+
+        max_id = max_id + 1.
+        new_entry-id        = max_id.
+        new_entry-name      =  <terminal_output>-part2.
+        new_entry-type      = 'D'.
+        new_entry-parent    = <current_dir>-id.
+
+        INSERT new_entry INTO TABLE mt_file_list.
+
+
+      ELSE. "File
+
+        CLEAR: new_entry.
+
+        max_id = max_id + 1.
+        new_entry-id        = max_id.
+        new_entry-name      = <terminal_output>-part2.
+        new_entry-size      = <terminal_output>-part1.
+        new_entry-type      = 'F'.
+        new_entry-parent    = <current_dir>-id.
+
+        INSERT new_entry INTO TABLE mt_file_list.
+
+      ENDIF.
+
+    ENDLOOP.
+
+    calculate_dir_size( 1 ).
+
+    LOOP AT mt_file_list ASSIGNING FIELD-SYMBOL(<dir>)
+        WHERE type = 'D'
+          AND size < 100000.
+
+      mv_result_part1 = mv_result_part1 + <dir>-size.
+
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    DATA(space_needed) = 30000000 - ( 70000000 - mt_file_list[ 1 ]-size ). "needed space - available space (root is biggest)
+    SORT mt_file_list BY size ASCENDING.
+
+    LOOP AT mt_file_list ASSIGNING FIELD-SYMBOL(<dir>)
+        WHERE size >= space_needed.
+
+      mv_result_part2 = <dir>-size.
+      EXIT.
+
+    ENDLOOP.
+
+
+
+  ENDMETHOD.
+
+
+  METHOD calculate_dir_size.
+
+    READ TABLE mt_file_list ASSIGNING FIELD-SYMBOL(<dir>) WITH KEY id = dir_id.
+
+    LOOP AT mt_file_list ASSIGNING FIELD-SYMBOL(<file>)
+        WHERE parent = dir_id .
+
+
+      IF <file>-size IS INITIAL. "not calculated directory
+
+        calculate_dir_size( <file>-id ).
+
+      ENDIF.
+
+      <dir>-size = <dir>-size + <file>-size.
+
+    ENDLOOP.
+
+
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'dayXX.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
