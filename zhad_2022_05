@@ -1,0 +1,218 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_05.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_stack,
+             id     TYPE i,
+             crates TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           END OF ty_stack,
+
+           BEGIN OF ty_instruction,
+             amount TYPE i,
+             from   TYPE i,
+             to     TYPE i,
+           END OF ty_instruction.
+
+    DATA: mt_stacks       TYPE SORTED TABLE OF ty_stack WITH NON-UNIQUE KEY id,
+          mt_stacks_orig  TYPE SORTED TABLE OF ty_stack WITH NON-UNIQUE KEY id,
+          mt_instructions TYPE TABLE OF ty_instruction.
+
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: group TYPE TABLE OF string,
+          stack TYPE ty_stack.
+
+    "Parse two times, once for cranes and once for instructions
+    LOOP AT mt_input_string ASSIGNING FIELD-SYMBOL(<input>).
+
+      IF <input> IS INITIAL."Empty line = end of group
+
+        "parse first into 2d, because we already have this
+        parse_input_2d_sep( EXPORTING input = group
+                                      by_position = p_2dpos
+                            IMPORTING data = mt_2d ).
+
+
+        LOOP AT mt_2d ASSIGNING FIELD-SYMBOL(<2d>)
+            WHERE value CA sy-abcde.
+
+          CLEAR: stack.
+          "Add to stack based on X position
+
+          stack-id = abs( <2d>-x / 4 ) + 1.
+
+          READ TABLE mt_stacks WITH KEY id = stack-id ASSIGNING FIELD-SYMBOL(<existing_stack>).
+          IF sy-subrc = 0.
+            INSERT <2d>-value INTO TABLE <existing_stack>-crates.
+          ELSE.
+            INSERT <2d>-value INTO TABLE stack-crates.
+            INSERT stack INTO TABLE mt_stacks.
+
+          ENDIF.
+
+
+        ENDLOOP.
+
+        CLEAR: group.
+
+      ELSE.
+
+        INSERT <input> INTO TABLE group.
+
+      ENDIF.
+
+    ENDLOOP.
+
+
+    "Instructions
+    TRY.
+
+        DATA: ref_to_data        TYPE REF TO data.
+        FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+        CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_instruction.
+
+        parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                    seperator1_space = p_sspace
+                                    newline_at_sep   = p_tnewl
+                                    remove_space     = p_remsp
+                                    replace_source   = p_reps
+                                    replace_target   = p_rept
+                                    seperator2       = CONV #( p_sep2 )
+                                    input            = group
+                            CHANGING data            = ref_to_data ).
+
+        ASSIGN ref_to_data->* TO <data>.
+        mt_instructions = <data>.
+
+      CATCH /wsv/cx_bp_general INTO DATA(exception).
+        exception->create_message( ).
+    ENDTRY.
+
+    mt_stacks_orig = mt_stacks.
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    FIELD-SYMBOLS: <source_stack> TYPE ty_stack,
+                   <target_stack> TYPE ty_stack.
+
+    LOOP AT mt_instructions ASSIGNING FIELD-SYMBOL(<instruction>).
+
+      "Get stacks
+      ASSIGN mt_stacks[ id = <instruction>-from ] TO <source_stack>.
+      ASSIGN mt_stacks[ id = <instruction>-to ] TO <target_stack>.
+
+
+      DO <instruction>-amount TIMES.
+
+        "Take
+        DATA(crate) = <source_stack>-crates[ 1 ]. "lowest row Id of this stack
+        " Delete
+        DELETE <source_stack>-crates INDEX 1.
+        "Put
+        INSERT crate INTO <target_stack>-crates INDEX 1.
+
+      ENDDO.
+
+    ENDLOOP.
+
+    LOOP AT mt_stacks ASSIGNING FIELD-SYMBOL(<stack>).
+
+      mv_result_part1_string = mv_result_part1_string && <stack>-crates[ 1 ].
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    FIELD-SYMBOLS: <source_stack> TYPE ty_stack,
+                   <target_stack> TYPE ty_stack.
+
+    DATA: tmp_stack TYPE ty_stack.
+
+    "return to orig config
+    mt_stacks = mt_stacks_orig.
+
+    LOOP AT mt_instructions ASSIGNING FIELD-SYMBOL(<instruction>).
+
+      CLEAR tmp_stack.
+
+      "Get stacks
+      ASSIGN mt_stacks[ id = <instruction>-from ] TO <source_stack>.
+      ASSIGN mt_stacks[ id = <instruction>-to ] TO <target_stack>.
+
+
+      DO <instruction>-amount TIMES.
+
+        "Take
+        DATA(crate) = <source_stack>-crates[ 1 ]. "lowest row Id of this stack
+        " Delete
+        DELETE <source_stack>-crates INDEX 1.
+        "Put (tmp)
+        INSERT crate INTO TABLE tmp_stack-crates.
+
+      ENDDO.
+
+      "Put real
+      INSERT LINES OF tmp_stack-crates INTO <target_stack>-crates INDEX 1.
+
+    ENDLOOP.
+
+    LOOP AT mt_stacks ASSIGNING FIELD-SYMBOL(<stack>).
+
+      mv_result_part2_string = mv_result_part2_string && <stack>-crates[ 1 ].
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'day05.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
