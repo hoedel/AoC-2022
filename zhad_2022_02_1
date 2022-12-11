@@ -1,0 +1,179 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_02_1.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_data,
+             opponent TYPE char1,
+             own      TYPE char1,
+           END OF ty_data,
+
+           BEGIN OF ty_weight,
+             type  TYPE char1,
+             value TYPE i,
+           END OF  ty_weight.
+
+
+
+    DATA: mt_guide TYPE TABLE OF ty_data.
+    METHODS parse_input RAISING /wsv/cx_bp_general.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: ref_to_data        TYPE REF TO data.
+    FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+    CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_data.
+
+    parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                seperator1_space = p_sspace
+                                newline_at_sep   = p_tnewl
+                                remove_space     = p_remsp
+                                replace_source   = p_reps
+                                replace_target   = p_rept
+                        CHANGING data            = ref_to_data ).
+
+    ASSIGN ref_to_data->* TO <data>.
+    mt_guide = <data>.
+
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    "Define weights
+    DATA: weights          TYPE TABLE OF ty_weight,
+          winning_matchups TYPE TABLE OF ty_data.
+
+
+    weights = VALUE #(
+( type = 'X'    value = 1 ) "Rock
+( type = 'Y'    value = 2 ) "Paper
+( type = 'Z'    value = 3 ) "Scissor
+( type = 'A'    value = 1 ) "Rock
+( type = 'B'    value = 2 ) "Paper
+( type = 'C'    value = 3 ) "Scissor
+).
+
+
+    winning_matchups = VALUE #(
+    (  opponent = 'A' own = 'Y' )
+    (  opponent = 'B' own = 'Z' )
+    (  opponent = 'C' own = 'X' )
+     ).
+
+
+    "Work
+    LOOP AT mt_guide INTO DATA(guide_entry).
+
+      mv_result_part1 = mv_result_part1 + weights[ type = guide_entry-own ]-value. "
+
+      IF  weights[ type = guide_entry-own ]-value =  weights[ type = guide_entry-opponent ]-value. "draw?
+
+        mv_result_part1 = mv_result_part1 + 3.
+      ELSE.
+        READ TABLE winning_matchups WITH KEY opponent = guide_entry-opponent
+                                             own = guide_entry-own TRANSPORTING NO FIELDS.
+        IF sy-subrc = 0.
+         mv_result_part1 = mv_result_part1 + 6.
+        ENDIF.
+      ENDIF.
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+
+  METHOD part2.
+
+    "Define weights
+    DATA: weights          TYPE TABLE OF ty_weight,
+          winning_matchups TYPE TABLE OF ty_data,
+          own              TYPE char1.
+
+
+    weights = VALUE #(
+( type = 'A'    value = 1 ) "Rock
+( type = 'B'    value = 2 ) "Paper
+( type = 'C'    value = 3 ) "Scissor
+( type = 'X'    value = 0 ) "Scissor
+( type = 'Y'    value = 3 ) "Scissor
+( type = 'Z'    value = 6 ) "Scissor
+).
+
+
+    winning_matchups = VALUE #(
+    (  opponent = 'A' own = 'B' )
+    (  opponent = 'B' own = 'C' )
+    (  opponent = 'C' own = 'A' )
+     ).
+
+
+    "Work
+    LOOP AT mt_guide INTO DATA(guide_entry).
+
+
+      CASE guide_entry-own.
+        WHEN 'X'. "loss
+          own = winning_matchups[ own = guide_entry-opponent ]-opponent.
+
+        WHEN 'Y'. "draw
+          own = guide_entry-opponent.
+
+        WHEN 'Z'. "win
+          own = winning_matchups[ opponent = guide_entry-opponent ]-own.
+
+      ENDCASE.
+
+      mv_result_part2 = mv_result_part2 + weights[ type = guide_entry-own ]-value + weights[ type = own ]-value.
+
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'day02.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2( ).
+
+      riddle->print_result( ).
+
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
