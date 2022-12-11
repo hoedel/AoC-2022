@@ -1,0 +1,313 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_09.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_motion,
+             direction TYPE char1,
+             amount    TYPE i,
+           END OF ty_motion.
+
+    DATA: mt_motions TYPE TABLE OF ty_motion.
+
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+    METHODS adjust_delta
+      IMPORTING value           TYPE i
+      RETURNING VALUE(adjusted) TYPE i.
+
+    METHODS calculate_delta
+      IMPORTING value1       TYPE i
+                value2       TYPE i
+      RETURNING VALUE(delta) TYPE i.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: ref_to_data        TYPE REF TO data.
+    FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+    TRY.
+
+        CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_motion.
+
+        parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                    seperator1_space = p_sspace
+                                    newline_at_sep   = p_tnewl
+                                    remove_space     = p_remsp
+                                    replace_source   = p_reps
+                                    replace_target   = p_rept
+                                    seperator2       = CONV #( p_sep2 )
+                            CHANGING data            = ref_to_data ).
+
+        ASSIGN ref_to_data->* TO <data>.
+        mt_motions = <data>.
+
+      CATCH /wsv/cx_bp_general INTO DATA(exception).
+        exception->create_message( ).
+    ENDTRY.
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+
+    DATA: visited_positions TYPE TABLE OF ty_2d.
+
+    DATA(head) = VALUE ty_2d( x = 0 y = 0 value = 'H' ).
+    DATA(tail) = VALUE ty_2d( x = 0 y = 0 value = 'T' ).
+
+
+    DATA(directions) = VALUE tt_2d(
+    ( value = 'R' x = 1     y = 0 )
+    ( value = 'L' x = -1    y = 0 )
+    ( value = 'U' x = 0     y = -1 )
+    ( value = 'D' x = 0     y = 1 )
+    ).
+
+    INSERT tail INTO TABLE visited_positions.
+
+    LOOP AT mt_motions ASSIGNING FIELD-SYMBOL(<motion>).
+
+      " translate direction to delta
+      READ TABLE directions WITH KEY value = <motion>-direction ASSIGNING FIELD-SYMBOL(<delta>).
+
+
+      "apply delta
+      DO <motion>-amount TIMES.
+
+        head-x = head-x + <delta>-x.
+        head-y = head-y + <delta>-y.
+
+        DATA(delta) = VALUE ty_2d( x = 0 y = 0 ).
+
+
+        " Logic to move Tail.
+
+        "Calculate distance
+        delta-x = calculate_delta( value1 = tail-x value2 = head-x ).
+        delta-y = calculate_delta( value1 = tail-y value2 = head-y ).
+
+
+        "Diagonal?
+        IF ( abs( delta-x ) + abs( delta-y ) ) >= 3.
+
+          "Adjust delta
+          IF abs( delta-x ) > abs( delta-y ).
+
+            delta-x = adjust_delta( delta-x ).
+
+          ELSEIF abs( delta-y ) > abs( delta-x ).
+
+            delta-y = adjust_delta( delta-y ).
+
+          ENDIF.
+
+        ELSE.
+
+          delta-x = adjust_delta( delta-x ).
+          delta-y = adjust_delta( delta-y ).
+
+        ENDIF.
+
+        "Apply Delta
+        tail-x = tail-x + delta-x.
+        tail-y = tail-y + delta-y.
+
+
+
+        READ TABLE visited_positions WITH KEY x = tail-x y = tail-y TRANSPORTING NO FIELDS. "where we there yet
+        IF sy-subrc <> 0.
+          INSERT tail INTO TABLE visited_positions.
+        ENDIF.
+
+      ENDDO.
+
+    ENDLOOP.
+
+
+    mv_result_part1 = lines( visited_positions ).
+
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    DATA: visited_positions TYPE TABLE OF ty_2d,
+          knots             TYPE TABLE OF ty_2d,
+          index             TYPE i.
+
+
+    " Head = 0
+    " Tails = 1-9
+
+    "create initial table
+
+    DO 10 TIMES.
+
+      INSERT VALUE ty_2d( x = 0 y = 0 value = index ) INTO TABLE knots.
+      index = index + 1.
+
+    ENDDO.
+
+
+    DATA(directions) = VALUE tt_2d(
+    ( value = 'R' x = 1     y = 0 )
+    ( value = 'L' x = -1    y = 0 )
+    ( value = 'U' x = 0     y = -1 )
+    ( value = 'D' x = 0     y = 1 )
+    ).
+
+*    INSERT tail INTO TABLE visited_positions.
+
+    LOOP AT mt_motions ASSIGNING FIELD-SYMBOL(<motion>).
+
+      " translate direction to delta
+      READ TABLE directions WITH KEY value = <motion>-direction ASSIGNING FIELD-SYMBOL(<delta>).
+
+
+      "apply delta
+      DO <motion>-amount TIMES.
+
+        "Get Head
+        ASSIGN knots[ value = 0 ] TO FIELD-SYMBOL(<head>).
+
+        <head>-x = <head>-x + <delta>-x.
+        <head>-y = <head>-y + <delta>-y.
+
+        "Calculate all knots one after the other
+        DATA(previous) = <head>.
+        LOOP AT knots ASSIGNING FIELD-SYMBOL(<knot>)
+         WHERE value <> 0. "not head
+
+          DATA(delta) = VALUE ty_2d( x = 0 y = 0 ).
+
+
+          " Logic to move Tail.
+
+          "Calculate distance
+          delta-x = calculate_delta( value1 = <knot>-x value2 = previous-x ).
+          delta-y = calculate_delta( value1 = <knot>-y value2 = previous-y ).
+
+
+          "Diagonal?
+          IF ( abs( delta-x ) + abs( delta-y ) ) >= 3.
+
+            "Adjust delta
+            IF abs( delta-x ) > abs( delta-y ).
+
+              delta-x = adjust_delta( delta-x ).
+
+            ELSEIF abs( delta-y ) > abs( delta-x ).
+
+              delta-y = adjust_delta( delta-y ).
+
+            ELSE. "equal, adjust both
+
+              delta-x = adjust_delta( delta-x ).
+              delta-y = adjust_delta( delta-y ).
+
+            ENDIF.
+
+          ELSEIF ( abs( delta-x ) + abs( delta-y ) ) = 1. "Adjacent = nothing to do
+            previous = <knot>.
+            CONTINUE.
+          ELSE.
+
+            delta-x = adjust_delta( delta-x ).
+            delta-y = adjust_delta( delta-y ).
+
+          ENDIF.
+
+          "Apply Delta
+          <knot>-x = <knot>-x + delta-x.
+          <knot>-y = <knot>-y + delta-y.
+
+
+          IF <knot>-value = 9.
+            READ TABLE visited_positions WITH KEY x = <knot>-x y = <knot>-y TRANSPORTING NO FIELDS. "where we there yet
+            IF sy-subrc <> 0.
+              INSERT <knot> INTO TABLE visited_positions.
+            ENDIF.
+          ENDIF.
+
+          previous = <knot>.
+
+        ENDLOOP.
+
+      ENDDO.
+
+    ENDLOOP.
+
+
+    mv_result_part2 = lines( visited_positions ).
+
+
+
+  ENDMETHOD.
+
+
+  METHOD adjust_delta.
+
+    IF value > 0.
+      adjusted = value - 1.
+    ELSEIF value < 0.
+      adjusted = value + 1.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD calculate_delta.
+
+    delta = value2 - value1.
+
+*    IF value2 < 0.
+*
+*      delta = delta * -1.
+*
+*    ENDIF.
+
+  ENDMETHOD.
+
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'dayXX.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
