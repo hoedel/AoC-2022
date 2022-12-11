@@ -1,0 +1,175 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_03_1.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_content,
+             first  TYPE string,
+             second TYPE string,
+             third  TYPE string,
+           END OF ty_content.
+
+    DATA: mt_contents  TYPE TABLE OF ty_content,
+          mt_contents2 TYPE TABLE OF ty_content.
+
+
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+    METHODS transform_letter_to_value
+      IMPORTING letter       TYPE char1
+      RETURNING VALUE(value) TYPE i.
+
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: content    TYPE ty_content,
+          offset_mid TYPE i.
+
+    LOOP AT mt_input_string ASSIGNING FIELD-SYMBOL(<input>).
+
+      CLEAR: content, offset_mid.
+
+      offset_mid = strlen( <input> ) / 2.
+
+
+      content-first   = substring( val = <input> off = 0 len = ( strlen( <input> ) / 2 ) ).
+      content-second  = substring( val = <input> off = ( strlen( <input> ) / 2 ) len = ( strlen( <input> ) / 2 ) ).
+
+      INSERT content INTO TABLE mt_contents.
+
+    ENDLOOP.
+
+
+    LOOP AT mt_input_string ASSIGNING <input>.
+
+      CASE sy-tabix MOD 3.
+
+        WHEN 2.
+
+          content-first = <input>.
+
+        WHEN 1.
+
+          content-second = <input>.
+
+        WHEN 0.
+
+          content-third = <input>.
+          INSERT content INTO TABLE mt_contents2.
+          CLEAR: content.
+
+      ENDCASE.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD transform_letter_to_value.
+
+    IF letter CO sy-abcde. "only upper case?
+      value = find(  val = sy-abcde sub = letter ) + 26 + 1.
+    ELSE.
+      value = find(  val = to_lower( sy-abcde ) sub = letter ) + 1.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    DATA: letter         TYPE char1.
+
+
+    LOOP AT mt_contents ASSIGNING FIELD-SYMBOL(<content>).
+
+      DO strlen( <content>-first ) TIMES .
+
+        DATA(offset) = sy-index - 1.
+        letter = <content>-first+offset(1).
+
+        " check if letter is on other compartment
+        IF <content>-second CA letter.
+          EXIT. "found, bye
+        ENDIF.
+
+      ENDDO.
+
+      "transform to value
+      mv_result_part1 = mv_result_part1 + transform_letter_to_value( letter ).
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+
+
+
+  METHOD part2.
+
+    DATA: letter         TYPE char1.
+
+    LOOP AT mt_contents2 ASSIGNING FIELD-SYMBOL(<content>).
+
+      DO strlen( <content>-first ) TIMES .
+
+        DATA(offset) = sy-index - 1.
+        letter = <content>-first+offset(1).
+
+        " check if letter is on other compartments
+        IF <content>-second CA letter.
+          IF <content>-third CA letter.
+            EXIT. "found, bye
+          ENDIF.
+        ENDIF.
+
+      ENDDO.
+
+      "transform to value
+      mv_result_part2 = mv_result_part2 + transform_letter_to_value( letter ).
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'day03.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
