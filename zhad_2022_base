@@ -1,0 +1,406 @@
+CLASS zhad_2022_base DEFINITION
+  PUBLIC
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+
+    TYPES:
+      BEGIN OF ty_2d,
+        x     TYPE i,
+        y     TYPE i,
+        value TYPE string,
+      END OF ty_2d .
+    TYPES:
+      tt_2d TYPE SORTED TABLE OF ty_2d WITH UNIQUE KEY y x .
+
+    METHODS constructor .
+    METHODS read_input
+      IMPORTING
+        !file TYPE string
+      RAISING
+        /wsv/cx_bp_general .
+    METHODS parse_input_text
+      IMPORTING
+        !seperator1       TYPE string OPTIONAL
+        !seperator1_space TYPE abap_bool OPTIONAL
+        !newline_at_sep   TYPE abap_bool OPTIONAL
+        !input            TYPE string_t OPTIONAL
+        !remove_space     TYPE abap_bool OPTIONAL
+        !replace_source   TYPE text15 OPTIONAL
+        !replace_target   TYPE text15 OPTIONAL
+        !by_position      TYPE abap_bool OPTIONAL
+        !seperator2       TYPE string OPTIONAL
+      CHANGING
+        !data             TYPE REF TO data
+      RAISING
+        /wsv/cx_bp_general .
+    METHODS parse_input_2d_sep
+      IMPORTING
+        !seperator1       TYPE string OPTIONAL
+        !seperator1_space TYPE abap_bool OPTIONAL
+        !input            TYPE string_t OPTIONAL
+        !by_position      TYPE abap_bool OPTIONAL
+      EXPORTING
+        VALUE(data)       TYPE tt_2d .
+    METHODS part1 .
+    METHODS part2 .
+    METHODS print_result .
+    METHODS print_2d .
+  PROTECTED SECTION.
+    DATA: mt_input_string        TYPE TABLE OF string,
+          mv_result_part1        TYPE int8,
+          mv_result_part2        TYPE int8,
+          mv_result_part1_string TYPE string,
+          mv_result_part2_string TYPE string,
+          mt_2d                  TYPE SORTED TABLE OF ty_2d WITH UNIQUE KEY y x.
+
+    METHODS clean_input
+      IMPORTING input                TYPE string_t
+                remove_space         TYPE abap_bool OPTIONAL
+                replace_source       TYPE text15 OPTIONAL
+                replace_target       TYPE text15 OPTIONAL
+      RETURNING VALUE(input_cleaned) TYPE string_t.
+
+
+  PRIVATE         SECTION.
+
+
+    DATA: mv_runtime_start TYPE i.
+
+
+ENDCLASS.
+
+
+
+CLASS zhad_2022_base IMPLEMENTATION.
+
+
+  METHOD  clean_input.
+
+    input_cleaned = input.
+
+    " remove + replace characters
+    LOOP AT input_cleaned ASSIGNING FIELD-SYMBOL(<input>).
+
+      " replace
+      IF replace_source IS NOT INITIAL.
+        REPLACE ALL OCCURRENCES OF replace_source IN <input> WITH replace_target.
+      ENDIF.
+
+      IF remove_space = abap_true.
+        CONDENSE <input> NO-GAPS.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD constructor.
+
+    GET RUN TIME FIELD mv_runtime_start.
+
+  ENDMETHOD.
+
+
+  METHOD part1.
+  ENDMETHOD.
+
+  METHOD part2.
+  ENDMETHOD.
+
+
+  METHOD parse_input_2d_sep.
+
+    DATA(input_local) = input.
+
+    IF input_local IS INITIAL.
+      input_local = mt_input_string.
+    ENDIF.
+
+    DATA : line TYPE ty_2d.
+    DATA(index_y) = 0.
+
+    LOOP AT input_local ASSIGNING FIELD-SYMBOL(<input>).
+
+      IF <input> IS INITIAL.
+        EXIT.
+      ENDIF.
+
+*      CONDENSE <input>.
+
+      DATA(index_x) = 0.
+
+      IF seperator1_space = abap_true.
+
+        SPLIT <input> AT space INTO TABLE DATA(lt_input_split1) IN CHARACTER MODE.
+
+      ELSEIF seperator1 IS NOT INITIAL.
+        SPLIT <input> AT seperator1 INTO TABLE lt_input_split1 IN CHARACTER MODE.
+
+      ELSEIF by_position = abap_true.
+
+        CLEAR: lt_input_split1.
+        DO strlen( <input> ) TIMES.
+
+          DATA(offset) = sy-index - 1.
+          INSERT <input>+offset(1) INTO TABLE lt_input_split1.
+
+        ENDDO.
+
+      ENDIF.
+
+      LOOP AT lt_input_split1 ASSIGNING FIELD-SYMBOL(<input_split_1>).
+
+        CLEAR: line.
+
+        line-x      = index_x.
+        line-y      = index_y.
+        line-value  = <input_split_1>.
+
+        INSERT line INTO TABLE data.
+
+        index_x = index_x + 1.
+
+
+      ENDLOOP.
+
+      index_y = index_y + 1.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD parse_input_text.
+
+    DATA(input_local) = input.
+
+    IF input_local IS INITIAL.
+      input_local = mt_input_string.
+    ENDIF.
+
+    input_local = clean_input( input          = input_local
+                           remove_space   = remove_space
+                           replace_source = replace_source
+                           replace_target = replace_target ).
+
+    " Table
+    FIELD-SYMBOLS: <data_table> TYPE ANY TABLE.
+    ASSIGN data->* TO <data_table>.
+
+    "Line
+    DATA: line_ref TYPE REF TO data.
+
+    DATA(line_descr) = CAST cl_abap_tabledescr(  cl_abap_tabledescr=>describe_by_data_ref( data ) )->get_table_line_type( ).
+
+    CREATE DATA line_ref TYPE HANDLE line_descr.
+
+    FIELD-SYMBOLS: <line> TYPE any.
+    ASSIGN line_ref->* TO <line>.
+
+
+    LOOP AT input_local ASSIGNING FIELD-SYMBOL(<input>). "Line by Line
+
+      CLEAR: <line>.
+
+      DATA(index) = 1.
+
+      IF seperator1_space = abap_true.    "create new internal row at space/sep1
+
+        SPLIT <input> AT space INTO TABLE DATA(lt_input_split1) IN CHARACTER MODE.
+
+      ELSEIF seperator1 IS NOT INITIAL.
+        SPLIT <input> AT seperator1 INTO TABLE lt_input_split1 IN CHARACTER MODE.
+
+      ELSEIF by_position = abap_true.
+
+        CLEAR: lt_input_split1.
+        DO strlen( <input> ) TIMES.
+
+          DATA(offset) = sy-index - 1.
+          INSERT <input>+offset(1) INTO TABLE lt_input_split1.
+
+        ENDDO.
+
+      ELSE. " 1:1 transfer without seperator
+
+        INSERT <input> INTO TABLE lt_input_split1.
+
+      ENDIF.
+
+      "split into table lines or structure fields?
+      IF newline_at_sep = abap_false. "fields
+
+        LOOP AT lt_input_split1 ASSIGNING FIELD-SYMBOL(<input_split_1>). "field by field
+
+          IF seperator2 IS INITIAL.
+
+            ASSIGN COMPONENT sy-tabix OF STRUCTURE <line> TO FIELD-SYMBOL(<field>).
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION TYPE /wsv/cx_bp_general MESSAGE e037(xml_42) WITH sy-tabix.
+            ENDIF.
+
+            <field> = <input_split_1>.
+
+          ELSE.
+
+
+            SPLIT <input_split_1> AT seperator2 INTO TABLE DATA(input_split2) IN CHARACTER MODE.
+
+            LOOP AT input_split2 ASSIGNING FIELD-SYMBOL(<input_split_2>). "
+
+              ASSIGN COMPONENT index OF STRUCTURE <line> TO <field>.
+              IF sy-subrc <> 0.
+                RAISE EXCEPTION TYPE /wsv/cx_bp_general MESSAGE e037(xml_42) WITH sy-tabix.
+              ENDIF.
+
+              <field> = <input_split_2>.
+              index = index + 1.
+
+            ENDLOOP.
+
+
+          ENDIF.
+
+        ENDLOOP.
+
+        INSERT <line> INTO TABLE <data_table>.
+
+      ELSE. "lines
+
+        LOOP AT lt_input_split1 ASSIGNING <input_split_1>.
+
+          ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <field>.
+          IF sy-subrc <> 0.
+            RAISE EXCEPTION TYPE /wsv/cx_bp_general MESSAGE e037(xml_42) WITH sy-tabix.
+          ENDIF.
+          <field> = <input_split_1>.
+          INSERT <line> INTO TABLE <data_table>.
+
+        ENDLOOP.
+
+
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD print_2d.
+
+    DATA: string TYPE string,
+          max    TYPE ty_2d.
+
+    ULINE.
+
+    LOOP AT mt_2d ASSIGNING FIELD-SYMBOL(<2d>). "This can be done cleaner
+
+      IF <2d>-x > max-x.
+        max-x = <2d>-x.
+      ENDIF.
+
+      IF <2d>-y > max-y.
+        max-y = <2d>-y.
+      ENDIF.
+
+    ENDLOOP.
+
+
+    DATA(y) = 0.
+
+    WHILE y <= max-y .
+
+      DATA(x) = 0.
+
+      WHILE x <= max-x.
+
+        READ TABLE mt_2d WITH KEY y = y x = x ASSIGNING FIELD-SYMBOL(<position>).
+        IF sy-subrc <> 0. "no Entry at this position -> print default char
+          string = string && '.'.
+        ELSE.
+          string = string && <position>-value.
+        ENDIF.
+
+        x = x + 1.
+
+      ENDWHILE.
+
+      CONDENSE string NO-GAPS.
+      WRITE: / string.
+      CLEAR: string.
+      y = y + 1.
+
+    ENDWHILE.
+
+    WRITE: / string.
+
+  ENDMETHOD.
+
+
+  METHOD print_result.
+
+    IF mv_result_part1 IS NOT INITIAL.
+      WRITE: / |Part 1: { mv_result_part1 }|.
+    ENDIF.
+
+    IF mv_result_part2 IS NOT INITIAL.
+      WRITE: / |Part 2: { mv_result_part2 }|.
+    ENDIF.
+
+    IF mv_result_part1_string IS NOT INITIAL.
+      WRITE: / |Part 1: { mv_result_part1_string }|.
+    ENDIF.
+
+    IF mv_result_part2_string IS NOT INITIAL.
+      WRITE: / |Part 2: { mv_result_part2_string }|.
+    ENDIF.
+
+    ULINE.
+
+    GET RUN TIME FIELD DATA(runtime_end).
+
+    WRITE: / |Runtime: { ( runtime_end - mv_runtime_start ) / 1000 } ms|.
+
+  ENDMETHOD.
+
+
+  METHOD read_input.
+
+    CALL METHOD cl_gui_frontend_services=>gui_upload
+      EXPORTING
+        filename                = file
+        filetype                = 'DAT'
+        has_field_separator     = ''
+        replacement             = space
+*       dat_mode                = 'X'
+      CHANGING
+        data_tab                = mt_input_string
+      EXCEPTIONS
+        file_open_error         = 1
+        file_read_error         = 2
+        no_batch                = 3
+        gui_refuse_filetransfer = 4
+        invalid_type            = 5
+        no_authority            = 6
+        unknown_error           = 7
+        bad_data_format         = 8
+        header_not_allowed      = 9
+        separator_not_allowed   = 10
+        header_too_long         = 11
+        unknown_dp_error        = 12
+        access_denied           = 13
+        dp_out_of_memory        = 14
+        disk_full               = 15
+        dp_timeout              = 16
+        not_supported_by_gui    = 17
+        error_no_gui            = 18
+        OTHERS                  = 19.
+
+    IF sy-subrc <> 0.
+      /wsv/cl_bp_exception_helper=>raise_from_sy( ).
+    ENDIF.
+
+  ENDMETHOD.
+ENDCLASS.
