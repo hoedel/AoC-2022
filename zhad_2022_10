@@ -1,0 +1,171 @@
+*&---------------------------------------------------------------------*
+*& Report zhad_2021_01_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zhad_2022_10.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    TYPES: BEGIN OF ty_instruction,
+             instruction TYPE string,
+             value       TYPE i,
+           END OF ty_instruction.
+
+    DATA: mt_instructions TYPE TABLE OF ty_instruction.
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    DATA: ref_to_data        TYPE REF TO data.
+    FIELD-SYMBOLS: <data>    TYPE ANY TABLE.
+
+    TRY.
+
+        CREATE DATA ref_to_data TYPE STANDARD TABLE OF ty_instruction.
+
+        parse_input_text( EXPORTING seperator1       = CONV #( p_sep1 )
+                                    seperator1_space = p_sspace
+                                    newline_at_sep   = p_tnewl
+                                    remove_space     = p_remsp
+                                    replace_source   = p_reps
+                                    replace_target   = p_rept
+                                    seperator2       = CONV #( p_sep2 )
+                            CHANGING data            = ref_to_data ).
+
+        ASSIGN ref_to_data->* TO <data>.
+        mt_instructions = <data>.
+
+      CATCH /wsv/cx_bp_general INTO DATA(exception).
+        exception->create_message( ).
+    ENDTRY.
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    DATA(register) = 1.
+    DATA(cycle) = 0.
+
+    LOOP AT mt_instructions ASSIGNING FIELD-SYMBOL(<instruction>).
+
+      cycle = cycle + 1.
+
+      IF ( cycle + 20 ) MOD 40 = 0.
+
+        mv_result_part1 = mv_result_part1 + ( cycle * register ).
+
+      ENDIF.
+
+      IF <instruction>-instruction = 'addx'.
+
+        cycle = cycle + 1.
+
+        IF ( cycle + 20 ) MOD 40 = 0.
+
+          mv_result_part1 = mv_result_part1 + ( cycle * register ).
+
+        ENDIF.
+
+        register = register + <instruction>-value.
+
+      ENDIF.
+
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    DATA tmp TYPE p DECIMALS 2.
+
+    DATA(register) = 1.
+    DATA(cycle) = 0.
+
+    DATA(pos) = VALUE ty_2d( x = 0 y = 0 ).
+
+    LOOP AT mt_instructions ASSIGNING FIELD-SYMBOL(<instruction>).
+
+      CLEAR pos.
+      pos-x = cycle MOD 40.
+      tmp = cycle / 40.
+      pos-y = floor( tmp ).
+
+      IF pos-x BETWEEN ( register - 1 ) AND ( register + 1 ).
+        pos-value = '#'.
+      ELSE.
+        pos-value = '.'.
+      ENDIF.
+
+      INSERT pos INTO TABLE mt_2d.
+
+      cycle = cycle + 1.
+
+      IF <instruction>-instruction = 'addx'.
+
+        CLEAR pos.
+        pos-x = cycle MOD 40.
+        tmp = cycle / 40.
+        pos-y = floor( tmp ).
+
+        IF pos-x BETWEEN ( register - 1 ) AND ( register + 1 ).
+          pos-value = '#'.
+        ELSE.
+          pos-value = '.'.
+        ENDIF.
+
+        INSERT pos INTO TABLE mt_2d.
+
+        cycle = cycle + 1.
+
+        register = register + <instruction>-value.
+
+      ENDIF.
+
+    ENDLOOP.
+
+    print_2d( ).
+    ULINE.
+
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'dayXX.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
