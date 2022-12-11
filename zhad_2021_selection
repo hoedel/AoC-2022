@@ -1,0 +1,77 @@
+*&---------------------------------------------------------------------*
+*&  Include  zhad_2021_selection
+*&---------------------------------------------------------------------*
+DATA: dummy_text TYPE text10.
+
+PARAMETERS  :p_finput TYPE string DEFAULT 'G:\Admin\privat\advent\2022\'.
+
+SELECTION-SCREEN SKIP.
+
+SELECTION-SCREEN BEGIN OF BLOCK parser WITH FRAME TITLE TEXT-001.
+
+*PARAMETERS: p_text TYPE abap_bool RADIOBUTTON GROUP 1,
+*            p_xy   TYPE abap_bool RADIOBUTTON GROUP 1,
+*            p_no   TYPE abap_bool RADIOBUTTON GROUP 1,
+*            p_tree TYPE abap_bool RADIOBUTTON GROUP 1.
+
+
+*SELECTION-SCREEN SKIP.
+
+PARAMETERS: p_remsp TYPE abap_bool AS CHECKBOX.
+*SELECT-OPTIONS: so_rem FOR dummy_text NO INTERVALS.
+
+SELECTION-SCREEN SKIP.
+PARAMETERS: p_reps TYPE text15,
+            p_rept TYPE text15.
+
+
+SELECTION-SCREEN SKIP.
+
+SELECTION-SCREEN BEGIN OF BLOCK ptext WITH FRAME TITLE TEXT-002.
+
+*SELECTION-SCREEN BEGIN OF BLOCK bgroup WITH FRAME TITLE TEXT-004.
+*PARAMETERS  :p_gnl TYPE abap_bool AS CHECKBOX,
+*             p_gno TYPE i.
+*
+*SELECTION-SCREEN END OF BLOCK bgroup.
+
+
+SELECTION-SCREEN SKIP.
+
+PARAMETERS: p_sspace TYPE abap_bool AS CHECKBOX,
+            p_sep1   TYPE text10,
+            p_sep2   TYPE text10.
+
+SELECTION-SCREEN SKIP.
+
+PARAMETERS: p_tnewl TYPE abap_bool AS CHECKBOX,
+            p_tpos  type abap_bool as CHECKBOX.
+
+
+SELECTION-SCREEN END OF BLOCK ptext.
+
+SELECTION-SCREEN BEGIN OF BLOCK 2dtext WITH FRAME TITLE TEXT-005.
+
+PARAMETERS: p_2ds1s TYPE abap_bool AS CHECKBOX,
+            p_2ds1  TYPE text10.
+SELECTION-SCREEN skip.
+
+PARAMETERS: p_2dpos type abap_bool as CHECKBOX.
+
+
+SELECTION-SCREEN END OF BLOCK 2dtext.
+
+
+
+*SELECTION-SCREEN BEGIN OF BLOCK btree WITH FRAME TITLE TEXT-003.
+*
+*
+*PARAMETERS: p_groot  TYPE abap_bool AS CHECKBOX,
+*            p_trees1 TYPE text10,
+*            p_tss2   TYPE abap_bool AS CHECKBOX,
+*            p_trees2 TYPE text10.
+*
+*SELECTION-SCREEN END OF BLOCK btree.
+
+
+SELECTION-SCREEN  END OF BLOCK parser.
