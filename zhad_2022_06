@@ -1,0 +1,113 @@
+REPORT zhad_2022_06.
+
+INCLUDE zhad_2022_selection.
+
+CLASS zhad_2022_local DEFINITION INHERITING FROM zhad_2022_base.
+
+  PUBLIC SECTION.
+
+    DATA: mv_signal TYPE string.
+    METHODS parse_input.
+    METHODS part1 REDEFINITION.
+    METHODS part2 REDEFINITION.
+
+    METHODS find_distinct_characters
+      IMPORTING amount          TYPE i
+      RETURNING VALUE(position) TYPE i.
+
+ENDCLASS.
+
+CLASS zhad_2022_local IMPLEMENTATION.
+
+  METHOD parse_input.
+
+    mv_signal = mt_input_string[ 1 ].
+
+
+  ENDMETHOD.
+
+  METHOD part1.
+
+    mv_result_part1 = find_distinct_characters( 4 ).
+
+  ENDMETHOD.
+
+  METHOD part2.
+
+    mv_result_part2 = find_distinct_characters( 14 ).
+
+  ENDMETHOD.
+
+
+  METHOD find_distinct_characters.
+
+    DATA: last_characters    TYPE TABLE OF string,
+          previous_character TYPE string.
+
+    DO strlen( mv_signal ) TIMES.
+
+      DATA(offset) = sy-index - 1.
+      DATA(character) = mv_signal+offset(1).
+
+      CLEAR: previous_character.
+
+      INSERT character INTO TABLE last_characters.
+
+      IF lines( last_characters ) = amount. "check
+
+        DATA(all_unique) = abap_true.
+
+        DATA(last_check) = last_characters.
+        SORT last_check.
+        LOOP AT last_check ASSIGNING FIELD-SYMBOL(<check_character>).
+
+          IF previous_character IS NOT INITIAL
+          AND previous_character = <check_character>. "Due to sort duplicates are after oneanother
+            all_unique = abap_false.
+            EXIT.
+          ENDIF.
+
+          previous_character = <check_character>.
+
+        ENDLOOP.
+
+        IF all_unique = abap_true. "not found?
+          position = offset + 1.
+          EXIT.
+        ENDIF.
+
+        DELETE last_characters INDEX 1.
+
+      ENDIF.
+
+    ENDDO.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INITIALIZATION.
+
+  p_finput = p_finput && 'day06.txt'.
+
+START-OF-SELECTION.
+
+  TRY.
+
+      DATA(riddle) = NEW zhad_2022_local( ).
+
+      riddle->read_input( p_finput ).
+
+      riddle->parse_input( ).
+
+      riddle->part1( ).
+
+      riddle->part2(  ).
+
+      riddle->print_result( ).
+
+    CATCH /wsv/cx_bp_general INTO DATA(exception).
+
+      exception->create_message( ).
+
+  ENDTRY.
